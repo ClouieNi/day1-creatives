@@ -562,7 +562,10 @@ var completedTasksExpanded = false;
 /* ── Helpers ── */
 function el(id){ return document.getElementById(id); }
 function esc(str){ var d=document.createElement("div"); d.textContent=str==null?"":String(str); return d.innerHTML; }
-function isAdmin(){ return !!currentUser && currentUser.toLowerCase()===ADMIN_NAME.toLowerCase(); }
+/* Admin is whoever is logged in AND whose team record has role "Admin" — this follows
+   the account even if they rename themselves, instead of breaking on a hardcoded name. */
+function myTeamRecord(){ return currentUser ? teamMembers.find(function(m){ return m.name===currentUser; }) : null; }
+function isAdmin(){ var m=myTeamRecord(); return !!m && (m.role||"").toLowerCase()==="admin"; }
 function initials(n){ return (n||"?").trim().split(/\s+/).map(function(w){return w[0];}).slice(0,2).join("").toUpperCase(); }
 function fmtDate(iso){ if(!iso) return "—"; var p=iso.split("-"); if(p.length<3) return iso; var m=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; return m[parseInt(p[1],10)-1]+" "+parseInt(p[2],10)+", "+p[0]; }
 function timeAgo(iso){ var d=(Date.now()-new Date(iso).getTime())/1000; if(d<60)return"just now"; if(d<3600)return Math.floor(d/60)+"m ago"; if(d<86400)return Math.floor(d/3600)+"h ago"; return Math.floor(d/86400)+"d ago"; }
@@ -773,7 +776,14 @@ async function logActivity(user,action){
 await sb.from("activity").insert({username:user||currentUser,action:action});
 }
 /* ── Render ── */
-function renderAll(){ renderDashboard(); renderPlans(); renderPeriods(); renderTeam(); }
+function renderAll(){
+if(currentUser){
+var m=myTeamRecord();
+el("userRole").textContent=isAdmin()?"Admin":(m&&m.role?m.role:"Member");
+document.body.classList.toggle("is-admin",isAdmin());
+}
+renderDashboard(); renderPlans(); renderPeriods(); renderTeam();
+}
 function taskCounts(arr){
 var c={total:arr.length,done:0,prog:0,review:0,not:0};
 arr.forEach(function(t){
@@ -957,7 +967,7 @@ var grid=el("teamGrid"); grid.innerHTML="";
 if(!teamMembers.length){ grid.innerHTML='<div style="color:var(--muted)">No team members yet.</div>'; return; }
 teamMembers.forEach(function(m){
 var isMe=m.name===currentUser;
-var mIsAdmin=m.name.toLowerCase()===ADMIN_NAME.toLowerCase();
+var mIsAdmin=(m.role||"").toLowerCase()==="admin";
 var canManage=isMe||isAdmin();
 var card=document.createElement("div"); card.className="member"+(isMe?" me":"");
 card.innerHTML=
@@ -1421,7 +1431,7 @@ el("memberModal").showModal(); el("mName").focus();
 }
 if(btn.dataset.delmember){
 var dm=teamMembers.find(function(x){ return x.id===btn.dataset.delmember; });
-if(!dm||dm.name.toLowerCase()===ADMIN_NAME.toLowerCase()) return;
+if(!dm||(dm.role||"").toLowerCase()==="admin") return;
 var isSelf=dm.name===currentUser;
 if(!isSelf&&!isAdmin()) return;
 showConfirm('Remove "'+dm.name+'"?',isSelf?'You will be logged out.':'They will be removed from the team.',async function(){
