@@ -400,7 +400,7 @@ dialog[open]{animation:pop .18s ease}
 </section>
 <section id="view-periods" hidden>
 <h2 class="section">Tasks by Period</h2>
-<div class="pg-sub" style="margin:-8px 0 20px;color:var(--muted);font-size:12.5px">Tasks from every plan are grouped by their creation date into 15-day windows (1st&ndash;15th and 16th&ndash;end of month).</div>
+<div class="pg-sub" style="margin:-8px 0 20px;color:var(--muted);font-size:12.5px">Finished tasks from every plan are grouped by the date they were completed, into 15-day windows (1st&ndash;15th and 16th&ndash;end of month). Tasks not yet finished won't show here.</div>
 <div id="periodsList"></div>
 </section>
 <section id="view-team" hidden>
@@ -762,7 +762,7 @@ el("pinInput").value="";
 showLogin();
 });
 /* ── Navigation ── */
-var viewMeta={dashboard:{title:"Dashboard",sub:"Overview of all plans"},plans:{title:"Plans & Tasks",sub:"Manage plans, tasks, and deliverables"},periods:{title:"Periods",sub:"Tasks grouped into 15-day windows"},team:{title:"Team",sub:"Who can log in and own tasks"}};
+var viewMeta={dashboard:{title:"Dashboard",sub:"Overview of all plans"},plans:{title:"Plans & Tasks",sub:"Manage plans, tasks, and deliverables"},periods:{title:"Periods",sub:"Finished tasks grouped into 15-day windows"},team:{title:"Team",sub:"Who can log in and own tasks"}};
 function setView(v){
 ["dashboard","plans","periods","team"].forEach(function(x){ el("view-"+x).hidden=x!==v; });
 document.querySelectorAll(".nav button").forEach(function(b){ b.classList.toggle("active",b.dataset.view===v); });
@@ -819,24 +819,26 @@ d.innerHTML='<div class="avatar">'+esc(initials(a.username))+'</div>'+
 act.appendChild(d);
 });
 }
-/* Tasks by period view (every task, across all plans) */
+/* Tasks by period view: only FINISHED tasks, grouped by when they were completed
+   (not when they were created) into 15-day windows. */
 function renderPeriods(){
 var wrap=el("periodsList"); if(!wrap) return;
 wrap.innerHTML="";
-if(!tasks.length){
-wrap.innerHTML='<div class="empty"><p>No tasks yet.</p></div>';
+var finished=tasks.filter(function(t){ return t.status==="Completed" && t.completed_at; });
+if(!finished.length){
+wrap.innerHTML='<div class="empty"><p>No finished tasks yet.</p></div>';
 return;
 }
 var groups={};
-tasks.forEach(function(t){
-var key=periodKeyOf(t.created_at);
+finished.forEach(function(t){
+var key=periodKeyOf(t.completed_at);
 (groups[key]=groups[key]||[]).push(t);
 });
 var keys=Object.keys(groups).sort().reverse();
 keys.forEach(function(key){
 var group=document.createElement("div"); group.className="period-group";
 var tasksInPeriod=groups[key].slice().sort(function(a,b){
-return (b.created_at||"").localeCompare(a.created_at||"");
+return (b.completed_at||"").localeCompare(a.completed_at||"");
 });
 var head=document.createElement("div"); head.className="period-head";
 head.innerHTML='<h3>'+esc(periodLabelOf(key))+'</h3><span>'+tasksInPeriod.length+' task'+(tasksInPeriod.length===1?'':'s')+'</span>';
@@ -847,7 +849,7 @@ var plan=plans.find(function(p){ return p.id===t.plan_id; });
 var row=document.createElement("div"); row.className="period-task-row";
 row.innerHTML='<div class="task-info">'+
 '<div class="task-title">'+esc(t.title)+'</div>'+
-'<div class="task-meta">Plan: <b>'+esc(plan?plan.name:"—")+'</b> · Owner: <b>'+esc(t.owner||"—")+'</b>'+(t.end_date?' · due '+fmtDate(t.end_date):'')+'</div>'+
+'<div class="task-meta">Plan: <b>'+esc(plan?plan.name:"—")+'</b> · Owner: <b>'+esc(t.owner||"—")+'</b> · finished '+fmtDate((t.completed_at||"").slice(0,10))+(t.completed_by?' by <b>'+esc(t.completed_by)+'</b>':'')+'</div>'+
 '</div>'+
 '<span class="pill '+scls(t.status)+'">'+esc(t.status)+'</span>';
 row.addEventListener("click",function(){
